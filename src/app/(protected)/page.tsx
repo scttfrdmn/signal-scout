@@ -493,6 +493,23 @@ export default function HomePage() {
           >
             {dateStr}
           </span>
+          <a
+            href="https://github.com/scttfrdmn/signal-scout/issues/new?labels=feedback"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              fontSize: '9px',
+              fontFamily: "'DM Mono', monospace",
+              color: '#8a7e78',
+              textDecoration: 'none',
+              border: '1px solid #d4d0cb',
+              borderRadius: 3,
+              padding: '3px 8px',
+              letterSpacing: '0.08em',
+            }}
+          >
+            feedback
+          </a>
           <UserButton />
         </div>
       </header>
