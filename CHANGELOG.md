@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Removed debug email display from /unauthorized page (closes #1)
+- Removed /sign-up from public proxy routes (no sign-up page exists)
+
 ### Known Issues
 - Debug email displayed on /unauthorized page (to be removed)
 - Scan history not persisted to database (in-memory only)
