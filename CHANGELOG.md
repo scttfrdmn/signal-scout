@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-23
+
+### Fixed
+- Switch pipeline auth from `Authorization: Bearer` to `X-Api-Key` header — Clerk v7 intercepts Bearer tokens before they reach the route handler
+- Update `PIPELINE_API_URL` to canonical production domain (`enso-pipeline.vercel.app`) — deployment-specific URLs are Vercel-protected
+
 ## [0.3.0] - 2026-03-23
 
 ### Added
