@@ -1,31 +1,17 @@
 import type { Metadata } from 'next'
 import { ClerkProvider } from '@clerk/nextjs'
-import { currentUser } from '@clerk/nextjs/server'
-import { redirect } from 'next/navigation'
 import './globals.css'
-
-const ALLOWED_DOMAINS = ['playgroundlogic.co', 'enso.co']
 
 export const metadata: Metadata = {
   title: 'Signal Scout — ENSO',
   description: 'Surface organizations at brand inflection moments.',
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const user = await currentUser()
-
-  if (user) {
-    const email = user.primaryEmailAddress?.emailAddress ?? ''
-    const allowed = ALLOWED_DOMAINS.some(d => email.endsWith(`@${d}`))
-    if (!allowed) {
-      redirect('/unauthorized')
-    }
-  }
-
   return (
     <ClerkProvider>
       <html lang="en">
