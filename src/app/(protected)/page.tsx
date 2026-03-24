@@ -471,6 +471,16 @@ export default function HomePage() {
           >
             Signal Scout
           </span>
+          <span
+            style={{
+              fontSize: '8px',
+              fontFamily: "'DM Mono', monospace",
+              color: '#c0b8b0',
+              letterSpacing: '0.1em',
+            }}
+          >
+            v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
