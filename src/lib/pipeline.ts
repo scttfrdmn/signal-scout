@@ -21,7 +21,12 @@ export async function sendToPipeline(
       companyName: result.companyName,
       sector: result.sector,
       sponsor,
-      scoutSummary: result.opportunity,
+      scoutSummary: [
+        result.source.headline,
+        result.signal,
+        result.whyEnso,
+        `At Stake: ${result.urgency}`,
+      ].filter(Boolean).join('\n\n'),
       decisionMaker: `${result.decisionMaker.name}, ${result.decisionMaker.title}`,
       source: result.source.url
         ? `${result.source.publication} — ${result.source.headline}\n${result.source.url}`
