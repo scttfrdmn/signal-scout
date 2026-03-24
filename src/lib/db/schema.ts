@@ -5,6 +5,8 @@ export const scans = pgTable("scans", {
   userId: text("user_id").notNull(),
   focusArea: text("focus_area"),
   results: jsonb("results").notNull(), // ScanResult[]
+  statuses: jsonb("statuses").$type<Record<string, 'Pursuing' | 'Watch' | 'Passed'>>(),
+  pipelineSent: jsonb("pipeline_sent").$type<Record<string, boolean>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

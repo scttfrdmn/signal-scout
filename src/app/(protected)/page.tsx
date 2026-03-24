@@ -11,6 +11,8 @@ type ScanHistoryEntry = {
   focusArea: string
   timestamp: string
   results: ScanResult[]
+  statuses?: Record<string, Status>
+  pipelineSent?: Record<string, boolean>
 }
 
 const STATUS_STYLES: Record<Status, React.CSSProperties> = {
@@ -56,6 +58,7 @@ function ResultCard({
   onSendToPipeline,
   pipelineSent,
   pipelineSending,
+  pipelineError,
 }: {
   result: ScanResult
   index: number
@@ -64,6 +67,7 @@ function ResultCard({
   onSendToPipeline: (result: ScanResult) => void
   pipelineSent: boolean
   pipelineSending: boolean
+  pipelineError: boolean
 }) {
   return (
     <div
@@ -154,16 +158,16 @@ function ResultCard({
             textTransform: 'uppercase',
             letterSpacing: '0.16em',
             padding: '4px 10px',
-            background: pipelineSent ? 'rgba(0,100,60,0.07)' : '#1a1a1a',
-            color: pipelineSent ? '#004030' : 'white',
-            border: pipelineSent ? '1px solid rgba(0,100,60,0.2)' : '1px solid #1a1a1a',
+            background: pipelineSent ? 'rgba(0,100,60,0.07)' : pipelineError ? 'rgba(160,40,0,0.06)' : '#1a1a1a',
+            color: pipelineSent ? '#004030' : pipelineError ? '#8c2200' : 'white',
+            border: pipelineSent ? '1px solid rgba(0,100,60,0.2)' : pipelineError ? '1px solid rgba(160,40,0,0.2)' : '1px solid #1a1a1a',
             cursor: pipelineSent || pipelineSending ? 'default' : 'pointer',
             opacity: pipelineSending ? 0.5 : 1,
             borderRadius: 0,
             whiteSpace: 'nowrap',
           }}
         >
-          {pipelineSent ? 'Sent' : pipelineSending ? 'Sending...' : '→ Pipeline'}
+          {pipelineSent ? 'Sent' : pipelineSending ? 'Sending...' : pipelineError ? 'Retry' : '→ Pipeline'}
         </button>
       </div>
 
@@ -242,9 +246,28 @@ export default function HomePage() {
   const [history, setHistory] = useState<ScanHistoryEntry[]>([])
   const [pipelineSent, setPipelineSent] = useState<Record<string, boolean>>({})
   const [pipelineSending, setPipelineSending] = useState<Record<string, boolean>>({})
+  const [pipelineError, setPipelineError] = useState<Record<string, boolean>>({})
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
 
   const logEndRef = useRef<HTMLDivElement>(null)
+  const currentScanId = useRef<string | null>(null)
+
+  // Load scan history from DB on mount
+  useEffect(() => {
+    fetch('/api/scans')
+      .then(r => r.json())
+      .then((rows: Array<{ id: string; focusArea: string | null; createdAt: string; results: ScanResult[]; statuses: Record<string, Status> | null; pipelineSent: Record<string, boolean> | null }>) => {
+        setHistory(rows.map(row => ({
+          id: row.id,
+          focusArea: row.focusArea ?? 'General',
+          timestamp: row.createdAt,
+          results: row.results,
+          statuses: row.statuses ?? undefined,
+          pipelineSent: row.pipelineSent ?? undefined,
+        })))
+      })
+      .catch(() => { /* non-fatal */ })
+  }, [])
 
   useEffect(() => {
     if (logEndRef.current) {
@@ -256,11 +279,14 @@ export default function HomePage() {
     setScanning(true)
     setLog([])
     setResults([])
+    setStatuses({})
     setActiveHistoryId(null)
     setPipelineSent({})
     setPipelineSending({})
+    setPipelineError({})
 
     const scanId = Math.random().toString(36).slice(2, 10)
+    currentScanId.current = scanId
     const timestamp = new Date().toISOString()
     const currentFocusArea = focusArea.trim()
 
@@ -307,15 +333,22 @@ export default function HomePage() {
           }
           if (event.type === 'done') {
             setScanning(false)
-            setHistory((prev) => [
-              {
-                id: scanId,
-                focusArea: currentFocusArea || 'General',
-                timestamp,
-                results: [...scanResults],
-              },
-              ...prev.slice(0, 9),
-            ])
+            if (scanResults.length === 0) {
+              setLog((prev) => [...prev, 'Scan complete — no results found. Try a different focus area.'])
+            }
+            const entry: ScanHistoryEntry = {
+              id: scanId,
+              focusArea: currentFocusArea || 'General',
+              timestamp,
+              results: [...scanResults],
+            }
+            setHistory((prev) => [entry, ...prev.slice(0, 19)])
+            // Persist to DB (fire and forget)
+            fetch('/api/scans', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: scanId, focusArea: currentFocusArea || null, results: scanResults }),
+            }).catch(() => { /* non-fatal */ })
           }
           if (event.type === 'error' && event.message) {
             setLog((prev) => [...prev, `Error: ${event.message}`])
@@ -332,6 +365,7 @@ export default function HomePage() {
   async function sendToPipeline(result: ScanResult) {
     if (pipelineSent[result.id] || pipelineSending[result.id]) return
     setPipelineSending((prev) => ({ ...prev, [result.id]: true }))
+    setPipelineError((prev) => ({ ...prev, [result.id]: false }))
     try {
       await fetch('/api/send-to-pipeline', {
         method: 'POST',
@@ -341,9 +375,18 @@ export default function HomePage() {
           sponsor: user?.firstName ?? 'Signal Scout',
         }),
       })
-      setPipelineSent((prev) => ({ ...prev, [result.id]: true }))
+      const next = { ...pipelineSent, [result.id]: true }
+      setPipelineSent(next)
+      // Persist pipelineSent to DB
+      if (currentScanId.current) {
+        fetch(`/api/scans/${currentScanId.current}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pipelineSent: next }),
+        }).catch(() => { /* non-fatal */ })
+      }
     } catch {
-      // User can retry by clicking again
+      setPipelineError((prev) => ({ ...prev, [result.id]: true }))
     } finally {
       setPipelineSending((prev) => ({ ...prev, [result.id]: false }))
     }
@@ -351,12 +394,21 @@ export default function HomePage() {
 
   function setStatus(id: string, status: Status | undefined) {
     setStatuses((prev) => {
+      const next = { ...prev }
       if (status === undefined) {
-        const next = { ...prev }
         delete next[id]
-        return next
+      } else {
+        next[id] = status
       }
-      return { ...prev, [id]: status }
+      // Persist statuses to DB
+      if (currentScanId.current) {
+        fetch(`/api/scans/${currentScanId.current}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ statuses: next }),
+        }).catch(() => { /* non-fatal */ })
+      }
+      return next
     })
   }
 
@@ -364,8 +416,11 @@ export default function HomePage() {
     setResults(entry.results)
     setLog([])
     setActiveHistoryId(entry.id)
-    setPipelineSent({})
+    setStatuses(entry.statuses ?? {})
+    setPipelineSent(entry.pipelineSent ?? {})
     setPipelineSending({})
+    setPipelineError({})
+    currentScanId.current = entry.id
   }
 
   const now = new Date()
@@ -664,7 +719,9 @@ export default function HomePage() {
                 )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                {results.map((result, i) => (
+                {results
+                  .filter((r, i, arr) => arr.findIndex(x => x.companyName.toLowerCase().trim() === r.companyName.toLowerCase().trim()) === i)
+                  .map((result, i) => (
                   <ResultCard
                     key={result.id}
                     result={result}
@@ -674,6 +731,7 @@ export default function HomePage() {
                     onSendToPipeline={sendToPipeline}
                     pipelineSent={!!pipelineSent[result.id]}
                     pipelineSending={!!pipelineSending[result.id]}
+                    pipelineError={!!pipelineError[result.id]}
                   />
                 ))}
               </div>

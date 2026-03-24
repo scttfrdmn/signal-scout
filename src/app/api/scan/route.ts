@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
       try {
         const stream = anthropic.messages.stream({
-          model: 'claude-opus-4-5',
+          model: 'claude-opus-4-6',
           max_tokens: 16000,
           tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 7 } as any],
           messages: [{ role: 'user', content: prompt }],
