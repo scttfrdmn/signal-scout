@@ -6,12 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-23
+
 ### Fixed
 - Removed debug email display from /unauthorized page (closes #1)
 - Removed /sign-up from public proxy routes (no sign-up page exists)
 
 ### Known Issues
-- Debug email displayed on /unauthorized page (to be removed)
 - Scan history not persisted to database (in-memory only)
 - Result status (Pursuing/Watch/Passed) not persisted to database
 - Scout → Pipeline send not verified end-to-end
