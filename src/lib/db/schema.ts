@@ -1,5 +1,15 @@
 import { pgTable, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 
+export const savedSearches = pgTable("saved_searches", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  focusArea: text("focus_area").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type SavedSearch = typeof savedSearches.$inferSelect;
+
 export const scans = pgTable("scans", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),

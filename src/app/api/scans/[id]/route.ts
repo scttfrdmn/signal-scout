@@ -17,6 +17,7 @@ export async function PATCH(
   const updates: Partial<typeof scans.$inferInsert> = {};
   if (body.statuses !== undefined) updates.statuses = body.statuses;
   if (body.pipelineSent !== undefined) updates.pipelineSent = body.pipelineSent;
+  if (body.results !== undefined) updates.results = body.results;
 
   const [updated] = await db
     .update(scans)
@@ -26,4 +27,22 @@ export async function PATCH(
 
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(updated);
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  const [deleted] = await db
+    .delete(scans)
+    .where(and(eq(scans.id, id), eq(scans.userId, userId)))
+    .returning({ id: scans.id });
+
+  if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return new NextResponse(null, { status: 204 });
 }
