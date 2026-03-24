@@ -15,7 +15,7 @@ export async function sendToPipeline(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${secret}`,
+      "X-Api-Key": secret,
     },
     body: JSON.stringify({
       companyName: result.companyName,
