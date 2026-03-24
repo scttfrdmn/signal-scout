@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-23
+
+### Added
+- Scan history persisted to Neon database; survives page refresh (closes #4)
+- Result statuses (Pursuing/Watch/Passed) and pipeline-sent state persisted via `PATCH /api/scans/[id]` (closes #5)
+- Result deduplication within a scan by company name (closes #7)
+- No-results message when scan completes with zero matches (closes #9)
+- Retry button on pipeline send failure (closes #9)
+
+### Changed
+- Upgraded Anthropic model from `claude-opus-4-5` to `claude-opus-4-6` (closes #8)
+
+### Known Issues
+- Scout → Pipeline send not verified end-to-end (#6)
+
 ## [0.1.0] - 2026-03-23
 
 ### Fixed
