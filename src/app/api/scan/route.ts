@@ -1,6 +1,9 @@
-import { auth } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { buildDiscoveryPrompt } from '@/lib/anthropic/prompt'
+import { buildDiscoveryPrompt, buildDiscoveryPromptFromTemplate } from '@/lib/anthropic/prompt'
+import { db } from '@/lib/db'
+import { promptVersions } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import type { ScanResult } from '@/lib/db/schema'
 
 export const maxDuration = 300
@@ -26,7 +29,40 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}))
   const focusArea: string | undefined = body.focusArea || undefined
-  const prompt = buildDiscoveryPrompt(focusArea)
+  const promptVersionId: string | undefined = body.promptVersionId || undefined
+
+  let prompt: string
+  let isLab = false
+  let resolvedVersionId: string | undefined
+
+  if (promptVersionId) {
+    // Lab scan: require prompt-editor role
+    const user = await currentUser()
+    if (user?.publicMetadata?.role !== 'prompt-editor') {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    }
+    const [version] = await db.select().from(promptVersions).where(eq(promptVersions.id, promptVersionId))
+    if (!version) {
+      return new Response(JSON.stringify({ error: 'Prompt version not found' }), { status: 404 })
+    }
+    prompt = buildDiscoveryPromptFromTemplate(version.body, version.focusAreaInstruction, focusArea)
+    isLab = true
+    resolvedVersionId = promptVersionId
+  } else {
+    // Regular scan: use active DB version, fall back to hardcoded
+    const [activeVersion] = await db
+      .select()
+      .from(promptVersions)
+      .where(eq(promptVersions.status, 'active'))
+      .limit(1)
+
+    if (activeVersion) {
+      prompt = buildDiscoveryPromptFromTemplate(activeVersion.body, activeVersion.focusAreaInstruction, focusArea)
+      resolvedVersionId = activeVersion.id
+    } else {
+      prompt = buildDiscoveryPrompt(focusArea)
+    }
+  }
 
   const encoder = new TextEncoder()
 
@@ -61,7 +97,6 @@ export async function POST(req: Request) {
 
         const final = await stream.finalMessage()
 
-        // Extract all text content blocks
         let rawText = ''
         for (const block of final.content) {
           if (block.type === 'text') {
@@ -69,7 +104,6 @@ export async function POST(req: Request) {
           }
         }
 
-        // Extract JSON array from the response
         const jsonMatch = rawText.match(/\[[\s\S]*\]/)
         if (!jsonMatch) {
           emit({ type: 'error', message: 'No valid JSON array found in response' })
@@ -95,7 +129,7 @@ export async function POST(req: Request) {
           emit({ type: 'result', data: result })
         }
 
-        emit({ type: 'done' })
+        emit({ type: 'done', isLab, promptVersionId: resolvedVersionId })
       } catch (e) {
         emit({ type: 'error', message: String(e) })
       } finally {

@@ -1,14 +1,4 @@
-export function buildDiscoveryPrompt(focusArea?: string): string {
-  const today = new Date()
-  const cutoff = new Date(today)
-  cutoff.setDate(cutoff.getDate() - 60)
-  const cutoffStr = cutoff.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-
-  const focusInstruction = focusArea
-    ? `\n\nFOCUS AREA WEIGHTING: The user has specified a focus area: "${focusArea}". Weight your results toward organizations in this space while still surfacing the highest-signal opportunities overall.`
-    : ''
-
-  return `You are a brand-intelligence analyst for ENSO, a brand strategy and design firm. Your task is to surface organizations that are at a brand inflection moment — companies and institutions that urgently need brand strategy, narrative design, or identity work.
+export const SEED_PROMPT_BODY = `You are a brand-intelligence analyst for ENSO, a brand strategy and design firm. Your task is to surface organizations that are at a brand inflection moment — companies and institutions that urgently need brand strategy, narrative design, or identity work.
 
 You have access to the web_search tool. Run EXACTLY 7 searches in this sequence:
 
@@ -20,7 +10,7 @@ You have access to the web_search tool. Run EXACTLY 7 searches in this sequence:
 6. Search: Bloomberg OR Reuters OR "Fast Company" executive "transformation" OR "repositioning" declaration 2026
 7. Search: "Fast Company" OR Wired OR NYT OR "Ad Age" CMO OR "Chief Brand Officer" OR CEO profile 2026
 
-CRITICAL: Only include signals published or announced after ${cutoffStr}. Discard anything older than 60 days.${focusInstruction}
+CRITICAL: Only include signals published or announced after {{CUTOFF_DATE}}. Discard anything older than 60 days.{{FOCUS_AREA_INSTRUCTION}}
 
 SIGNAL TYPES TO IDENTIFY (in priority order):
 1. Brand-Strategy Mismatch — organization whose ambition or scale has outpaced brand clarity; the world sees a different company than they intend
@@ -61,4 +51,28 @@ Each element must have exactly these fields:
 }
 
 Remember: output ONLY the JSON array. Start your response with [ and end with ].`
+
+export const SEED_FOCUS_AREA_INSTRUCTION = `\n\nFOCUS AREA WEIGHTING: The user has specified a focus area: "{{FOCUS_AREA}}". Weight your results toward organizations in this space while still surfacing the highest-signal opportunities overall.`
+
+export function buildDiscoveryPromptFromTemplate(
+  body: string,
+  focusAreaInstruction: string,
+  focusArea?: string
+): string {
+  const today = new Date()
+  const cutoff = new Date(today)
+  cutoff.setDate(cutoff.getDate() - 60)
+  const cutoffStr = cutoff.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+
+  const resolvedFocusBlock = focusArea
+    ? focusAreaInstruction.replace('{{FOCUS_AREA}}', focusArea)
+    : ''
+
+  return body
+    .replace('{{CUTOFF_DATE}}', cutoffStr)
+    .replace('{{FOCUS_AREA_INSTRUCTION}}', resolvedFocusBlock)
+}
+
+export function buildDiscoveryPrompt(focusArea?: string): string {
+  return buildDiscoveryPromptFromTemplate(SEED_PROMPT_BODY, SEED_FOCUS_AREA_INSTRUCTION, focusArea)
 }
